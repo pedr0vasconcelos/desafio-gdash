@@ -1,0 +1,13 @@
+# Dependências
+node_modules/
+
+# Build
+dist/
+
+# Variáveis de Ambiente e Segredos
+.env
+
+# Python / Go binários e cache
+__pycache__/
+*.pyc
+worker/worker

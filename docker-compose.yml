@@ -1,0 +1,89 @@
+version: '3.8'
+
+services:
+  # ---------------------------
+  # Infraestrutura (Banco & Fila)
+  # ---------------------------
+  mongo:
+    image: mongo:6.0
+    container_name: gdash-mongo
+    restart: always
+    ports:
+      - "27017:27017"
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_USER}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_PASSWORD}
+    volumes:
+      - mongo_data:/data/db
+    networks:
+      - gdash-network
+
+  rabbitmq:
+    image: rabbitmq:3-management
+    container_name: gdash-rabbitmq
+    restart: always
+    ports:
+      - "5672:5672"   # Porta padrão AMQP
+      - "15672:15672" # Interface de Gestão (UI)
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD}
+    networks:
+      - gdash-network
+    healthcheck:
+      test: ["CMD", "rabbitmqctl", "status"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  # ---------------------------
+  # Aplicações (Serão habilitadas nos próximos passos)
+  # ---------------------------
+  
+  collector:
+    build: ./collector
+    container_name: gdash-collector
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    env_file: .env
+    networks:
+      - gdash-network
+
+  worker:
+    build: ./worker
+    container_name: gdash-worker
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    env_file: .env
+    networks:
+      - gdash-network
+
+  backend:
+    build: ./backend
+    container_name: gdash-backend
+    ports:
+      - "${PORT}:${PORT}"
+    depends_on:
+      - mongo
+    env_file: .env
+    networks:
+      - gdash-network
+
+  frontend:
+    build: ./frontend
+    container_name: gdash-frontend
+    ports:
+      - "5173:5173"
+    depends_on:
+      - backend
+    networks:
+      - gdash-network
+
+volumes:
+  mongo_data:
+
+networks:
+  gdash-network:
+    driver: bridge
